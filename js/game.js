@@ -1,9 +1,18 @@
+let cursors;
+let player;
+let leftPressed = false;
+let rightPressed = false;
+let upPressed = false;
 
 const config = {
     type: Phaser.AUTO,
-    width: 800,
-    height: 600,
-    parent: 'game-container',
+    width: window.innerWidth,
+    height: window.innerHeight,
+    backgroundColor: '#1d1d1d',
+    scale: {
+        mode: Phaser.Scale.RESIZE,
+        autoCenter: Phaser.Scale.CENTER_BOTH,
+    },
     physics: {
         default: 'arcade',
         arcade: {
@@ -11,139 +20,51 @@ const config = {
             debug: false
         }
     },
-    scene: [MenuScene, GameScene]
+    scene: {
+        preload: preload,
+        create: create,
+        update: update
+    }
 };
 
-let game = new Phaser.Game(config);
-
-function MenuScene() {
-    Phaser.Scene.call(this, { key: 'MenuScene' });
+function preload() {
+    this.load.image('ground', 'https://labs.phaser.io/assets/sprites/platform.png');
+    this.load.image('player', 'https://labs.phaser.io/assets/sprites/phaser-dude.png');
 }
-MenuScene.prototype = Object.create(Phaser.Scene.prototype);
-MenuScene.prototype.constructor = MenuScene;
 
-MenuScene.prototype.preload = function () {
-    this.load.image('startBtn', 'https://labs.phaser.io/assets/ui/button-start.png');
-    this.load.image('sky', 'https://labs.phaser.io/assets/skies/sky4.png');
-};
+function create() {
+    const ground = this.physics.add.staticGroup();
+    ground.create(config.width / 2, config.height - 20, 'ground').setScale(2).refreshBody();
 
-MenuScene.prototype.create = function () {
-    this.add.image(400, 300, 'sky');
-    const startBtn = this.add.image(400, 400, 'startBtn').setInteractive();
-    startBtn.on('pointerdown', () => {
-        this.scene.start('GameScene');
-    });
-    this.add.text(260, 200, 'JumpTrap', { fontSize: '48px', fill: '#ffffff' });
-};
-
-function GameScene() {
-    Phaser.Scene.call(this, { key: 'GameScene' });
-}
-GameScene.prototype = Object.create(Phaser.Scene.prototype);
-GameScene.prototype.constructor = GameScene;
-
-let player, platforms, cursors, coins, score = 0, scoreText, traps;
-
-GameScene.prototype.preload = function () {
-    this.load.image('sky', 'https://labs.phaser.io/assets/skies/sky4.png');
-    this.load.image('ground', 'https://labs.phaser.io/assets/platform.png');
-    this.load.image('coin', 'https://labs.phaser.io/assets/sprites/coin.png');
-    this.load.image('trap', 'https://labs.phaser.io/assets/sprites/spikedball.png');
-    this.load.spritesheet('dude', 'https://labs.phaser.io/assets/sprites/dude.png', {
-        frameWidth: 32,
-        frameHeight: 48
-    });
-    this.load.spritesheet('sparkle', 'https://labs.phaser.io/assets/particles/yellow.png', {
-        frameWidth: 16,
-        frameHeight: 16
-    });
-};
-
-GameScene.prototype.create = function () {
-    this.add.image(400, 300, 'sky');
-
-    platforms = this.physics.add.staticGroup();
-    platforms.create(400, 584, 'ground').setScale(2).refreshBody();
-    for (let i = 0; i < 16; i++) this.add.image(i * 64, 568, 'ground').setScale(0.5).setOrigin(0);
-
-    platforms.create(600, 450, 'ground');
-    platforms.create(100, 320, 'ground');
-    platforms.create(750, 250, 'ground');
-
-    player = this.physics.add.sprite(100, 450, 'dude');
-    player.setBounce(0.1);
+    player = this.physics.add.sprite(100, config.height - 150, 'player');
     player.setCollideWorldBounds(true);
-    this.physics.add.collider(player, platforms);
-
-    this.anims.create({
-        key: 'left',
-        frames: this.anims.generateFrameNumbers('dude', { start: 0, end: 3 }),
-        frameRate: 10,
-        repeat: -1
-    });
-    this.anims.create({
-        key: 'turn',
-        frames: [{ key: 'dude', frame: 4 }],
-        frameRate: 20
-    });
-    this.anims.create({
-        key: 'right',
-        frames: this.anims.generateFrameNumbers('dude', { start: 5, end: 8 }),
-        frameRate: 10,
-        repeat: -1
-    });
+    this.physics.add.collider(player, ground);
 
     cursors = this.input.keyboard.createCursorKeys();
 
-    coins = this.physics.add.staticGroup();
-    for (let i = 0; i < 7; i++) {
-        coins.create(100 + i * 100, 100, 'coin').setScale(0.8);
-    }
+    // Touch controls
+    document.getElementById('left').addEventListener('touchstart', () => leftPressed = true);
+    document.getElementById('left').addEventListener('touchend', () => leftPressed = false);
 
-    this.physics.add.overlap(player, coins, collectCoin, null, this);
+    document.getElementById('right').addEventListener('touchstart', () => rightPressed = true);
+    document.getElementById('right').addEventListener('touchend', () => rightPressed = false);
 
-    score = 0;
-    scoreText = this.add.text(16, 16, 'Монеты: 0/7', { fontSize: '24px', fill: '#fff' });
+    document.getElementById('up').addEventListener('touchstart', () => upPressed = true);
+    document.getElementById('up').addEventListener('touchend', () => upPressed = false);
+}
 
-    traps = this.physics.add.staticGroup();
-    traps.create(750, 200, 'trap');
-    this.physics.add.overlap(player, traps, hitTrap, null, this);
-};
-
-GameScene.prototype.update = function () {
-    if (cursors.left.isDown) {
+function update() {
+    if (cursors.left.isDown || leftPressed) {
         player.setVelocityX(-160);
-        player.anims.play('left', true);
-    } else if (cursors.right.isDown) {
+    } else if (cursors.right.isDown || rightPressed) {
         player.setVelocityX(160);
-        player.anims.play('right', true);
     } else {
         player.setVelocityX(0);
-        player.anims.play('turn');
     }
 
-    if ((cursors.up.isDown || cursors.space?.isDown) && (player.body.blocked.down || player.body.touching.down)) {
-        player.setVelocityY(-400);
-    }
-};
-
-function collectCoin(player, coin) {
-    const sparkle = player.scene.add.sprite(coin.x, coin.y, 'sparkle');
-    sparkle.setScale(2);
-    player.scene.time.delayedCall(300, () => sparkle.destroy());
-    coin.disableBody(true, true);
-    score += 1;
-    scoreText.setText('Монеты: ' + score + '/7');
-    if (score >= 7) {
-        player.scene.add.text(250, 300, 'Уровень пройден!', { fontSize: '32px', fill: '#0f0' });
-        player.scene.physics.pause();
-        player.setTint(0x00ff00);
+    if ((cursors.up.isDown || upPressed) && player.body.touching.down) {
+        player.setVelocityY(-330);
     }
 }
 
-function hitTrap(player, trap) {
-    player.scene.add.text(250, 300, 'Вы погибли!', { fontSize: '32px', fill: '#f00' });
-    player.scene.physics.pause();
-    player.setTint(0xff0000);
-    player.anims.play('turn');
-}
+const game = new Phaser.Game(config);
